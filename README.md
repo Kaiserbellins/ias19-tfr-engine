@@ -6,7 +6,10 @@ Motore Python per la valutazione IAS 19 del Trattamento di Fine Rapporto (art. 2
 - **Metodo alternativo:** linear proration (PUCM classico, pro-rata anzianità pregressa / totale).
 - **Output:** CCP, DW, PSL, CSL e la sua scomposizione (DC-R/A, DC-Inf, DC-Sal), DBO, service cost
   pro futuro, duration, erogazioni attese per anno, sensitivity.
-- **Curva dei tassi:** parametri Svensson BCE (curva AAA o tutti i titoli) convertiti in forward annui.
+- **Curva dei tassi:** parametri Svensson BCE della curva AAA convertiti in forward annui.
+- **Movimentazione:** DBO di apertura, service cost contabile, interest cost (forward anno 1 della
+  valutazione precedente × giorni/365), variazioni del fondo, utili/perdite scomposti in esperienza,
+  ipotesi demografiche e ipotesi finanziarie.
 
 Riconciliato al centesimo con il foglio di riferimento Garofalo al 30.09.2026: DBO di gruppo
 13.352.807,06 €, DBO per azienda e griglia di sensitivity 3×3, scomposizione del CSL.
@@ -40,6 +43,9 @@ nello stesso layout del foglio storico.
 pytest                                   # test sintetici
 IAS19_GAROFALO_XLSX=/percorso/foglio.xlsx pytest   # anche la riconciliazione con il foglio di riferimento
 ```
+
+Per la movimentazione servono anche `IAS19_GAROFALO_PREV_XLSX` (valutazione precedente, da
+convertire in .xlsx se è un .xls) e `IAS19_SCHEMA_XLSX` (schema dati cliente).
 
 I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e `data/`).
 

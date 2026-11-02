@@ -134,12 +134,20 @@ def dati_da_foglio_storico(path: str, arrotonda: bool = True) -> DatiValutazione
 
 
 def dati_da_schema_cliente(path: str, aziende_almeno_50: Optional[Set[int]] = None,
-                           carriera_default: int = 3, arrotonda: bool = True) -> DatiValutazione:
-    """Legge lo schema dati compilato dal cliente.
+                           carriera_default: int = 3, arrotonda: bool = True,
+                           aziende_escluse: Optional[Set[int]] = None,
+                           sesso_default: int = 1) -> DatiValutazione:
+    """Legge lo schema dati compilato dal cliente e applica le regole di passaggio all'InputTFR.
 
-    `aziende_almeno_50`: codici delle aziende con almeno 50 dipendenti (L. 296/2006), per le quali
-    tutto il TFR futuro esce dall'azienda (u = aliquota piena). Se None, la FIP indicata dal
-    cliente si usa cosi com'e.
+    Regole (confermate da Francesco il 02/11/2026, verificate sul caso Garofalo 30/09/2026):
+    - esclusi i dipendenti liquidati: righe senza dati anagrafici (eta vuota);
+    - escluse le aziende in `aziende_escluse` (es. cedute: Eutonia);
+    - FIP vuota = 0; FIP scritta come percentuale (6,9074) o arrotondata (0,0691) = aliquota piena;
+      valori intermedi tra 0 e l'aliquota piena sono ammessi;
+    - `aziende_almeno_50`: aziende con almeno 50 dipendenti (L. 296/2006), FIP = aliquota piena
+      per tutti i dipendenti;
+    - carriera vuota o 0 = `carriera_default` (3);
+    - futuro servizio 0, anzianita 0 e TFR negativo sono portati a 1, 1 e 0 (`_normalizza`).
     """
     wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
     avvisi: List[str] = []
@@ -156,11 +164,20 @@ def dati_da_schema_cliente(path: str, aziende_almeno_50: Optional[Set[int]] = No
         if not isinstance(r[1], (int, float)):
             continue
         _, codice, az, eta, sesso, anz, fut, tfr, fip, car, sal = r[:11]
-        if car in (None, ""):
+        if eta in (None, ""):
+            continue  # liquidato
+        if aziende_escluse and int(_num(az)) in aziende_escluse:
+            continue
+        if car in (None, "", 0):
             car = carriera_default
+        if sesso in (None, ""):
+            avvisi.append(f"riga {i}: sesso mancante, assunto {sesso_default}")
+            sesso = sesso_default
         fip = _num(fip)
         if fip > 1:  # percentuale scritta come 6,9074
             fip /= 100
+        if abs(fip - ALIQUOTA_TFR) < 1e-4:  # es. 0,0691 arrotondato
+            fip = ALIQUOTA_TFR
         if aziende_almeno_50 is not None and int(_num(az)) in aziende_almeno_50:
             fip = ALIQUOTA_TFR
         try:

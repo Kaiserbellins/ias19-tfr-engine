@@ -2,8 +2,8 @@
 
 La BCE pubblica ogni giorno lavorativo i parametri Svensson della curva dei rendimenti dell'area
 euro (https://www.ecb.europa.eu/stats/financial_markets_and_interest_rates/euro_area_yield_curves/).
-Serie: YC.B.U2.EUR.4F.<curva>.SV_C_YM.<parametro>, con <curva> = G_N_A (titoli AAA) oppure
-G_N_C (tutti i titoli) e <parametro> in BETA0..BETA3, TAU1, TAU2.
+Serie: YC.B.U2.EUR.4F.G_N_A.SV_C_YM.<parametro> (curva dei titoli di Stato AAA, scelta dello
+studio) con <parametro> in BETA0..BETA3, TAU1, TAU2.
 
 I tassi Svensson sono in percentuale, composti in continuo. Il motore li converte in tassi spot
 annui effettivi e poi in forward annui, per gli anni 1..50; oltre la scadenza massima
@@ -19,7 +19,7 @@ from typing import Dict, Optional
 
 import numpy as np
 
-CURVE = {"AAA": "G_N_A", "TUTTI": "G_N_C"}
+CURVE = {"AAA": "G_N_A"}
 PARAMETRI = ("BETA0", "BETA1", "BETA2", "BETA3", "TAU1", "TAU2")
 URL = "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.{curva}.SV_C_YM.{par}"
 
