@@ -10,7 +10,8 @@ storico, che diventa il "file di ipotesi" della valutazione.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+import re
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Set
 
 import numpy as np
@@ -131,11 +132,24 @@ def dati_da_foglio_storico(path: str, arrotonda: bool = True) -> DatiValutazione
         _, _, cod, az, _cc, eta, sesso, anz, fut, car, ral, tfr, fip = r
         dip.append(_normalizza(cod, az, eta, sesso, anz, fut, car, ral, tfr, _num(fip) / 100, arrotonda))
     aziende = {}
+    intervalli = []
     pil = wb["Pilota"]
-    for r in pil.iter_rows(min_row=12, max_row=60, max_col=3, values_only=True):
-        if isinstance(r[0], (int, float)) and r[1]:
-            aziende[int(r[0])] = Azienda(int(r[0]), str(r[1]), int(_num(r[2])))
+    for r in pil.iter_rows(min_row=12, max_row=60, max_col=5, values_only=True):
+        if isinstance(r[0], (int, float)) and r[1] and str(r[1]).strip():
+            n = int(_num(r[2]))
+            if n == 0 and re.fullmatch(r"(Soc|Az)\d+", str(r[1]).strip()):
+                continue  # righe libere del foglio
+            aziende[int(r[0])] = Azienda(int(r[0]), str(r[1]).strip(), n)
+            if n > 0 and isinstance(r[3], (int, float)) and isinstance(r[4], (int, float)):
+                intervalli.append((int(r[3]), int(r[4]), int(r[0])))
     wb.close()
+    # Il foglio attribuisce i dipendenti alle aziende per intervalli di righe (colonne Inizio/Fine di
+    # Pilota), non per codice azienda: es. Finnat, codici 1-2-3 nei dati, aziende 1-3-4 in Pilota.
+    def azienda_riga(i):
+        return next((k for a, b, k in intervalli if a <= i <= b), None)
+    nuove = [azienda_riga(i) for i in range(1, len(dip) + 1)]
+    if intervalli and all(k is not None for k in nuove):
+        dip = [replace(e, azienda=k) for e, k in zip(dip, nuove)]
     return DatiValutazione(dip, aziende)
 
 

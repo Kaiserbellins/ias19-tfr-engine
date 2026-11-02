@@ -76,7 +76,8 @@ IAS19_GAROFALO_XLSX=/percorso/foglio.xlsx pytest   # anche la riconciliazione co
 
 Per la movimentazione servono anche `IAS19_GAROFALO_PREV_XLSX` (valutazione precedente, da
 convertire in .xlsx se è un .xls) e `IAS19_SCHEMA_XLSX` (schema dati cliente); per la relazione
-`IAS19_RELAZIONE_DOCX` (relazione usata come modello).
+`IAS19_RELAZIONE_DOCX` (relazione usata come modello). Il caso Finnat (tre trimestri 2026) usa
+`IAS19_FINNAT_DIR`, cartella con i fogli storici convertiti in .xlsx.
 
 I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e `data/`).
 

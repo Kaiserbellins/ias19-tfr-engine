@@ -299,6 +299,137 @@ def _numera_didascalie(body) -> None:
                     primo = False
 
 
+def _rigenera_indici(body) -> None:
+    """Riscrive il contenuto in cache di sommario e indici (campi TOC) dai titoli e dalle didascalie.
+
+    Le voci puntano a segnalibri nuovi con campi PAGEREF senza numero di pagina: Word li completa
+    all'aggiornamento dei campi. Cosi nel documento non restano voci del modello (altri clienti).
+    """
+    from docx.oxml import OxmlElement
+    qn = _ns()
+    W_P, W_R = qn("w:p"), qn("w:r")
+    paragrafi = list(body.iter(W_P))
+    n_bm = [0]
+
+    def segnalibro(p) -> str:
+        n_bm[0] += 1
+        nome = f"_Toc9{n_bm[0]:07d}"
+        a = OxmlElement("w:bookmarkStart")
+        a.set(qn("w:id"), str(900000 + n_bm[0]))
+        a.set(qn("w:name"), nome)
+        b = OxmlElement("w:bookmarkEnd")
+        b.set(qn("w:id"), str(900000 + n_bm[0]))
+        ppr = p.find(qn("w:pPr"))
+        if ppr is not None:
+            ppr.addnext(a)
+        else:
+            p.insert(0, a)
+        p.append(b)
+        return nome
+
+    def campo(tipo, testo=None):
+        r = OxmlElement("w:r")
+        if tipo == "instr":
+            it = OxmlElement("w:instrText")
+            it.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+            it.text = testo
+            r.append(it)
+        else:
+            fc = OxmlElement("w:fldChar")
+            fc.set(qn("w:fldCharType"), tipo)
+            r.append(fc)
+        return r
+
+    # campi TOC: run di inizio, istruzione, run di fine (con annidamento)
+    runs = list(body.iter(W_R))
+    campi = []
+    for i, r in enumerate(runs):
+        it = r.find(qn("w:instrText"))
+        if it is None or not (it.text or "").strip().startswith("TOC"):
+            continue
+        j = i
+        while j >= 0 and runs[j].find(qn("w:fldChar")) is None:
+            j -= 1
+        livello, fine = 0, None
+        for k in range(j, len(runs)):
+            fc = runs[k].find(qn("w:fldChar"))
+            if fc is None:
+                continue
+            t = fc.get(qn("w:fldCharType"))
+            livello += 1 if t == "begin" else (-1 if t == "end" else 0)
+            if livello == 0:
+                fine = runs[k]
+                break
+        sep = next(runs[k] for k in range(i, len(runs)) if runs[k].find(qn("w:fldChar")) is not None
+                   and runs[k].find(qn("w:fldChar")).get(qn("w:fldCharType")) == "separate")
+        campi.append((it.text, sep, fine))
+
+    def paragrafo_di(el):
+        while el is not None and el.tag != W_P:
+            el = el.getparent()
+        return el
+
+    for istr, sep, fine in campi:
+        p0, p1 = paragrafo_di(sep), paragrafo_di(fine)
+        cache = []
+        el = p0.getnext()
+        while el is not None and el is not p1:
+            cache.append(el)
+            el = el.getnext()
+        proto_ppr = {}
+        for el in cache + [p0]:
+            ppr = el.find(qn("w:pPr")) if el.tag == W_P else None
+            st = ppr.find(qn("w:pStyle")) if ppr is not None else None
+            if st is not None and st.get(qn("w:val")) not in proto_ppr and _testo(el).strip():
+                proto_ppr[st.get(qn("w:val"))] = copy.deepcopy(ppr)
+        m = re.search(r'\\c\s+"(\w+)"', istr)
+        if m:
+            voci = [(1, p) for p in paragrafi if _stile(p) in ("Didascalia", "Caption")
+                    and _testo(p).strip().startswith(m.group(1) + " ")]
+        else:
+            voci = []
+            for p in paragrafi:
+                st = _stile(p)
+                if st in ("Titolo1", "Heading1"):
+                    voci.append((1, p))
+                elif st in ("Titolo2", "Heading2", "Titolo3", "Heading3"):
+                    voci.append((2, p))
+        # svuota la cache
+        for el in cache:
+            body.remove(el) if el.getparent() is body else el.getparent().remove(el)
+        for c in list(p0):
+            if c.tag != qn("w:pPr") and c is not fine and list(p0).index(c) > list(p0).index(sep):
+                p0.remove(c)
+        if p1 is not p0:
+            for c in list(p1):
+                if c is fine:
+                    break
+                if c.tag != qn("w:pPr"):
+                    p1.remove(c)
+        stili = sorted(proto_ppr)
+        nuovi = []
+        for liv, p in voci:
+            testo = _testo(p).strip()
+            if not testo:
+                continue
+            nome = segnalibro(p)
+            q = OxmlElement("w:p")
+            chiave = next((k for k in stili if k.endswith(str(liv))), stili[0] if stili else None)
+            if chiave:
+                q.append(copy.deepcopy(proto_ppr[chiave]))
+            cont = q
+            if "\\h" in istr:
+                cont = OxmlElement("w:hyperlink")
+                cont.set(qn("w:anchor"), nome)
+                cont.set(qn("w:history"), "1")
+                q.append(cont)
+            for r in (_run(testo + "\t"), campo("begin"), campo("instr", f" PAGEREF {nome} \\h "),
+                      campo("separate"), campo("end")):
+                cont.append(r)
+            nuovi.append(q)
+        _inserisci_dopo(p0, nuovi)
+
+
 # ---------------------------------------------------------------- tabelle esistenti (Tabelle 1-6)
 
 def _testo_cella(tc, testo: str, grassetto: Optional[bool] = None) -> None:
@@ -525,7 +656,9 @@ def _tabelle_ipotesi(r: DatiRelazione, tabelle: Dict[str, object]) -> None:
     if comp is not None and "rg48" in tabelle:
         base = comp[0]
         righe = [("h", ["x", "MLx", "FLx"])]
-        righe += [("d", [str(x), numero(base[1][x], 6), numero(base[2][x], 6)]) for x in range(len(base[1]))]
+        # come nel modello: senza separatore delle migliaia (colonne strette)
+        righe += [("d", [str(x), numero(base[1][x], 6).replace(".", ""), numero(base[2][x], 6).replace(".", "")])
+                  for x in range(len(base[1]))]
         _riempi_tabella(tabelle["rg48"], righe)
     for sesso, s in ((1, "M"), (2, "F")):
         gruppi = _gruppi_categorie(ip, sesso, cat_tutte)
@@ -1139,6 +1272,16 @@ def scrivi_relazione(modello: str, uscita: str, r: DatiRelazione) -> None:
 
     # --- numerazione didascalie e aggiornamento di sommario e indici all'apertura
     _numera_didascalie(body)
+    _rigenera_indici(body)
+    # campo FILENAME della copertina
+    import os
+    for fs in body.iter(qn("w:fldSimple")):
+        if "FILENAME" in (fs.get(qn("w:instr")) or ""):
+            ts = list(fs.iter(qn("w:t")))
+            if ts:
+                ts[0].text = os.path.basename(uscita)
+                for t in ts[1:]:
+                    t.text = ""
     settings = doc.settings.element
     for u in settings.findall(qn("w:updateFields")):
         settings.remove(u)
