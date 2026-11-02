@@ -22,6 +22,12 @@ ETA_MAX = 111
 N_CATEGORIE = 10
 
 
+def _apri(path: str):
+    if str(path).lower().endswith(".xls"):
+        raise ValueError(f"{path}: formato .xls non supportato, salvarlo come .xlsx")
+    return openpyxl.load_workbook(path, data_only=True, read_only=True)
+
+
 def _num(v, default=0.0) -> float:
     if v is None or v == "":
         return default
@@ -43,7 +49,7 @@ def ipotesi_da_excel(path: str, aliquota_tfr: float = ALIQUOTA_TFR) -> Ipotesi:
     Tax: righe 2..51 = anni 1..50; B inflazione, C rivalutazione (solo controllo),
          D attualizzazione, F..O incremento salariale reale p=1..10.
     """
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    wb = _apri(path)
     tav = wb["Tav"]
     rows = list(tav.iter_rows(min_row=1, max_row=341, max_col=27, values_only=True))
 
@@ -116,7 +122,7 @@ def _normalizza(codice, azienda, eta, sesso, anz, futuro, carriera, salario, tfr
 
 def dati_da_foglio_storico(path: str, arrotonda: bool = True) -> DatiValutazione:
     """Legge `InputTFR` (FIP espressa in percentuale, es. 6.9074) e i nomi aziende da `Pilota`."""
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    wb = _apri(path)
     ws = wb["InputTFR"]
     dip = []
     for r in ws.iter_rows(min_row=3, max_col=13, values_only=True):
@@ -149,7 +155,7 @@ def dati_da_schema_cliente(path: str, aziende_almeno_50: Optional[Set[int]] = No
     - carriera vuota o 0 = `carriera_default` (3);
     - futuro servizio 0, anzianita 0 e TFR negativo sono portati a 1, 1 e 0 (`_normalizza`).
     """
-    wb = openpyxl.load_workbook(path, data_only=True, read_only=True)
+    wb = _apri(path)
     avvisi: List[str] = []
     aziende: Dict[int, Azienda] = {}
     cod = wb["codici"]
@@ -205,8 +211,6 @@ def valida(dv: DatiValutazione) -> List[str]:
         if not 0 <= e.fip <= ALIQUOTA_TFR + 1e-9:
             av.append(f"dip. {e.codice}: aliquota FIP {e.fip} fuori range")
     for n, a in dv.aziende.items():
-        if a.dipendenti and conta.get(n, 0) != a.dipendenti:
-            av.append(f"azienda {n} {a.nome}: {conta.get(n, 0)} dipendenti nei dati, {a.dipendenti} dichiarati")
         # tolleranza: arrotondamento all'euro di ogni posizione individuale
         if a.tfr and abs(tfr.get(n, 0.0) - a.tfr) > 0.5 * conta.get(n, 1) + 1:
             av.append(f"azienda {n} {a.nome}: TFR dati {tfr.get(n, 0.0):,.2f} vs contabile {a.tfr:,.2f}")

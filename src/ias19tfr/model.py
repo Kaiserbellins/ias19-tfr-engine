@@ -34,6 +34,8 @@ class Dipendente:
 class TavolaPermanenza:
     """l_x per sesso e categoria: lx[(sesso, p)] = array indicizzato per eta 0..111."""
     lx: Dict[tuple, np.ndarray]
+    # componenti grezze, conservate per ricostruire la tavola (sensitivity sul turnover)
+    componenti: Optional[tuple] = None
 
     def sopravvivenza(self, sesso: int, p: int, eta: int) -> float:
         """Probabilita di restare attivo da eta a eta+1."""
@@ -59,7 +61,15 @@ class TavolaPermanenza:
                 ratio = base[x] / base[x - 1] if base[x - 1] > 0 else 0.0
                 col[x] = col[x - 1] * ratio * (1 - d[x]) * (1 - a[x])
             out[(sesso, p)] = col
-        return cls(out)
+        return cls(out, (lx_base, dimissioni, anticipazioni, radice))
+
+    def con_turnover(self, delta: float) -> "TavolaPermanenza":
+        """Tavola con frequenze di dimissione aumentate di `delta` (assoluto) dove sono positive."""
+        if self.componenti is None:
+            raise ValueError("tavola senza componenti: impossibile variare il turnover")
+        base, dim, ant, radice = self.componenti
+        nuove = {k: np.where(d > 0, np.clip(d + delta, 0.0, 1.0), d) for k, d in dim.items()}
+        return TavolaPermanenza.costruisci(base, nuove, ant, radice)
 
 
 @dataclass

@@ -23,6 +23,20 @@ pip install -e ".[dev]"
 
 ## Uso
 
+La valutazione completa (con movimentazione rispetto alla valutazione precedente) si descrive in un
+file YAML: vedi [`esempi/valutazione_esempio.yaml`](esempi/valutazione_esempio.yaml).
+
+```bash
+ias19tfr esegui valutazione.yaml
+```
+
+L'Excel dei risultati contiene i fogli Riepilogo (schede per azienda), Movimentazione, Sensitivity
+(griglia ±10% e variazioni assolute su tassi, inflazione e turnover), Andamento (dati del grafico
+prospettico), Disclosure (duration, service cost pro futuro, erogazioni attese), Statistiche (per età
+e anzianità) e Dipendenti (risultati individuali).
+
+Valutazione rapida senza movimentazione:
+
 ```bash
 # dati e ipotesi dal foglio di calcolo storico (fogli InputTFR, Tax, Tav)
 ias19tfr valuta --dati "TFR Garofalo_2026_09.xlsx" --ipotesi "TFR Garofalo_2026_09.xlsx" \

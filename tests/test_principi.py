@@ -54,3 +54,13 @@ def test_tasso_piu_alto_dbo_piu_basso():
     a = valuta([dip()], ipotesi(att=0.03))[0].dbo
     b = valuta([dip()], ipotesi(att=0.04))[0].dbo
     assert b < a
+
+
+def test_turnover_piu_alto_riduce_dbo_con_attualizzazione_sopra_rivalutazione():
+    from ias19tfr.scenari import sensitivity_assoluta
+    sa = sensitivity_assoluta([dip(ALIQUOTA_TFR)], ipotesi())
+    su = sa["Tasso di turnover +1.00%"][0]
+    giu = sa["Tasso di turnover -1.00%"][0]
+    base = valuta([dip(ALIQUOTA_TFR)], ipotesi())[0].dbo
+    # uscite anticipate = meno anni di sconto netto (i > r): DBO piu vicino al TFR contabile
+    assert giu < base < su

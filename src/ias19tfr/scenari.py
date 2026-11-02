@@ -74,10 +74,14 @@ def sensitivity_assoluta(dip: Sequence[Dipendente], ip: Ipotesi, metodo: str = "
         (f"Tasso di inflazione +{d_infl:.2%}", replace(ip, finanziarie=ip.finanziarie.scala(shift_inflazione=d_infl))),
         (f"Tasso di inflazione -{d_infl:.2%}", replace(ip, finanziarie=ip.finanziarie.scala(shift_inflazione=-d_infl))),
     ]
+    if d_turnover and ip.tavola.componenti is not None:
+        scen += [
+            (f"Tasso di turnover +{d_turnover:.2%}", replace(ip, tavola=ip.tavola.con_turnover(d_turnover))),
+            (f"Tasso di turnover -{d_turnover:.2%}", replace(ip, tavola=ip.tavola.con_turnover(-d_turnover))),
+        ]
     out = {}
     for nome, ipx in scen:
         out[nome] = {k: r.dbo_metodo(metodo) for k, r in valuta(dip, ipx).items()}
-    # turnover: richiede la ricostruzione della tavola, gestita da chi possiede le basi grezze
     return out
 
 

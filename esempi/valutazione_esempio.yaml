@@ -1,0 +1,21 @@
+# Valutazione IAS 19 del TFR - esempio di configurazione (caso Garofalo 30/09/2026).
+# I percorsi sono relativi a questo file.
+data_valutazione: 2026-09-30
+metodo: financial                 # financial | lineare
+
+dati:
+  file: "Schema dati TFR 30.09.2026 per attuario.xlsx"
+  formato: cliente                # cliente | storico
+
+ipotesi: "TFR Garofalo_2026_09.xlsx"   # cartella con i fogli Tax e Tav
+
+aziende_almeno_50: [1, 2, 3, 5, 10, 17, 22, 23, 28, 29, 30]
+aziende_escluse: [27]             # Eutonia, ceduta
+trasferimenti: {32: 921968.00}    # Citta di Roma, TFR acquisito nel periodo
+
+precedente:
+  data: 2025-12-31
+  file: "TFR Garofalo_2025_12.xlsx"    # valutazione precedente (dati e ipotesi di apertura)
+
+sensitivity_assoluta: true
+uscita: "Risultati IAS19 2026_09.xlsx"
