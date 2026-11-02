@@ -82,7 +82,7 @@ def _movimentazione_cfg(cfg: dict, base: Path, dv, ip, metodo: str):
     return mov, ip_prev, tr
 
 
-def ifrs18(configs, uscita: str, cliente: str = "") -> int:
+def ifrs18(configs, uscita: str, cliente: str = "", trimestri: bool = False) -> int:
     """Prospetto trimestrale IFRS 18 da piu configurazioni YAML dello stesso esercizio."""
     import yaml
     from .ifrs18 import Periodo, scrivi_prospetto
@@ -99,7 +99,7 @@ def ifrs18(configs, uscita: str, cliente: str = "") -> int:
         periodi.append(Periodo(_data(cfg["data_valutazione"]), mov))
         nomi.update({k: a.nome for k, a in dv.aziende.items()})
         cliente = cliente or (cfg.get("relazione") or {}).get("cliente", "")
-    scrivi_prospetto(uscita, periodi, nomi, cliente or "Gruppo")
+    scrivi_prospetto(uscita, periodi, nomi, cliente or "Gruppo", trimestri=trimestri)
     print(f"Prospetto IFRS 18 scritto in {uscita}")
     return 0
 
@@ -160,6 +160,8 @@ def main(argv=None) -> int:
     f.add_argument("config", nargs="+")
     f.add_argument("--uscita", required=True)
     f.add_argument("--cliente", default="")
+    f.add_argument("--trimestri", action="store_true",
+                   help="singoli trimestri per differenza (default: progressivi dall'inizio dell'esercizio)")
     v = sub.add_parser("valuta", help="valutazione rapida e Excel dei risultati")
     v.add_argument("--dati", required=True)
     v.add_argument("--ipotesi", required=True, help="cartella con i fogli Tax e Tav")
@@ -172,7 +174,7 @@ def main(argv=None) -> int:
     if a.cmd == "esegui":
         return esegui(a.config)
     if a.cmd == "ifrs18":
-        return ifrs18(a.config, a.uscita, a.cliente)
+        return ifrs18(a.config, a.uscita, a.cliente, a.trimestri)
 
     ip = ipotesi_da_excel(a.ipotesi)
     if a.formato == "storico":

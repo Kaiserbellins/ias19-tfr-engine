@@ -64,12 +64,26 @@ def _valori(m: Movimentazione) -> Dict[str, float]:
     return {c: (0.0 if abs(x) < 0.005 else x) for c, x in v.items()}
 
 
-def colonne(periodi: Sequence[Periodo], k: int) -> List[tuple]:
-    """Colonne (etichetta, valori): trimestri discreti e poi progressivo dell'ultimo periodo."""
+def _apertura(periodi: Sequence[Periodo]) -> str:
+    """Data di inizio esercizio (31/12 dell'anno precedente l'ultimo periodo)."""
+    return f"31/12/{periodi[-1].fine.year - 1}"
+
+
+def colonne(periodi: Sequence[Periodo], k: int, trimestri: bool = False) -> List[tuple]:
+    """Colonne (etichetta, valori).
+
+    Default: una colonna per valutazione, progressiva dall'inizio dell'esercizio (DBO di apertura
+    sempre quella di fine esercizio precedente). Con `trimestri`: singoli trimestri per differenza
+    tra progressivi consecutivi, seguiti dal progressivo dell'ultimo periodo.
+    """
+    vuoto = {c: 0.0 for c, _, _ in VOCI}
+    if not trimestri:
+        return [(f"{p.fine:%d/%m/%Y} ({p.fine.month} mesi)", _valori(p.movimenti[k]) if k in p.movimenti else vuoto)
+                for p in periodi]
     out = []
     prec: Optional[Dict[str, float]] = None
     for p in periodi:
-        cur = _valori(p.movimenti[k]) if k in p.movimenti else {c: 0.0 for c, _, _ in VOCI}
+        cur = _valori(p.movimenti[k]) if k in p.movimenti else dict(vuoto)
         if prec is None:
             disc = dict(cur)
         else:
@@ -80,9 +94,8 @@ def colonne(periodi: Sequence[Periodo], k: int) -> List[tuple]:
         out.append((f"{trimestre}° trim. {p.fine.year}", disc))
         prec = cur
     ultimo = periodi[-1]
-    mesi = ultimo.fine.month
-    out.append((f"Progressivo {mesi} mesi {ultimo.fine.year}",
-                _valori(ultimo.movimenti[k]) if k in ultimo.movimenti else {c: 0.0 for c, _, _ in VOCI}))
+    out.append((f"Progressivo {ultimo.fine.month} mesi {ultimo.fine.year}",
+                _valori(ultimo.movimenti[k]) if k in ultimo.movimenti else vuoto))
     return out
 
 
@@ -127,7 +140,7 @@ def _blocco(ws, titolo: str, cols: List[tuple], confronto: Optional[tuple] = Non
 def scrivi_prospetto(path: str, periodi: Sequence[Periodo], nomi: Mapping[int, str], cliente: str,
                      confronto: Optional[Mapping[int, Movimentazione]] = None,
                      etichetta_confronto: str = "Esercizio precedente",
-                     note: Sequence[str] = ()) -> None:
+                     note: Sequence[str] = (), trimestri: bool = False) -> None:
     periodi = sorted(periodi, key=lambda p: p.fine)
     anno = periodi[-1].fine.year
     wb = Workbook()
@@ -135,14 +148,17 @@ def scrivi_prospetto(path: str, periodi: Sequence[Periodo], nomi: Mapping[int, s
     ws.title = "Gruppo"
     ws.append([f"{cliente} - Movimentazione trimestrale del TFR (IAS 19) {anno} ai fini dell'IFRS 18"])
     ws["A1"].font = Font(bold=True, size=13)
-    ws.append(["Importi in euro. Trimestri ottenuti per differenza tra valutazioni progressive."])
+    ws.append(["Importi in euro. " + ("Trimestri ottenuti per differenza tra valutazioni progressive."
+                                      if trimestri else
+                                      f"Valori progressivi dal {_apertura(periodi)}: "
+                                      "passività di inizio periodo sempre quella di fine esercizio precedente.")])
     ws.append([])
     conf = (lambda k: (etichetta_confronto, _valori(confronto[k])) if confronto and k in confronto else None)
-    _blocco(ws, cliente, colonne(periodi, 0), conf(0))
+    _blocco(ws, cliente, colonne(periodi, 0, trimestri), conf(0))
     ws2 = wb.create_sheet("Per società")
     chiavi = sorted({k for p in periodi for k in p.movimenti if k})
     for k in chiavi:
-        _blocco(ws2, nomi.get(k, f"Azienda {k}"), colonne(periodi, k), conf(k))
+        _blocco(ws2, nomi.get(k, f"Azienda {k}"), colonne(periodi, k, trimestri), conf(k))
     for w in (ws, ws2):
         w.column_dimensions["A"].width = 52
         w.column_dimensions["B"].width = 40
@@ -159,7 +175,7 @@ def scrivi_prospetto(path: str, periodi: Sequence[Periodo], nomi: Mapping[int, s
         c.fill = TESTA
         c.alignment = Alignment(wrap_text=True, horizontal="center")
     for k in [0] + chiavi:
-        for etich, v in colonne(periodi, k):
+        for etich, v in colonne(periodi, k, trimestri):
             ws3.append([cliente if k == 0 else nomi.get(k, str(k)), etich, v["service_cost"], v["nie"], v["ce"], v["oci"]])
             for c in ws3[ws3.max_row][2:]:
                 c.number_format = EUR
@@ -184,9 +200,11 @@ def scrivi_prospetto(path: str, periodi: Sequence[Periodo], nomi: Mapping[int, s
         "ipotesi demografiche ed esperienza.",
         "5. Benefici pagati, trasferimenti e altre variazioni del fondo: movimenti dello stato patrimoniale, "
         "fuori dal conto economico.",
-        "6. Le valutazioni infrannuali sono progressive dall'inizio dell'esercizio; i valori del singolo "
-        "trimestre sono la differenza tra progressivi consecutivi. La DBO di inizio trimestre è la DBO della "
-        "valutazione del trimestre precedente.",
+        ("6. Le valutazioni infrannuali sono progressive dall'inizio dell'esercizio; i valori del singolo "
+         "trimestre sono la differenza tra progressivi consecutivi. La DBO di inizio trimestre è la DBO della "
+         "valutazione del trimestre precedente." if trimestri else
+         "6. Ogni colonna è progressiva dall'inizio dell'esercizio: la passività di inizio periodo è sempre "
+         "quella di fine esercizio precedente e i flussi si riferiscono ai mesi trascorsi."),
         "7. Il net interest expense è calcolato sulla DBO di inizio esercizio al tasso forward del primo anno "
         "della valutazione di chiusura dell'esercizio precedente, per i giorni trascorsi su 365.",
     ] + list(note)

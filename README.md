@@ -53,7 +53,8 @@ all'apertura del documento in Word (confermare la richiesta di aggiornamento dei
 
 Prospetto delle movimentazioni trimestrali per la transizione all'IFRS 18 (service cost in categoria
 operativa, interest cost in categoria di finanziamento, utili/perdite attuariali in OCI), a partire
-dalle configurazioni delle valutazioni progressive dello stesso esercizio:
+dalle configurazioni delle valutazioni progressive dello stesso esercizio. Ogni colonna parte dalla
+passività di fine esercizio precedente; con `--trimestri` si ottengono i singoli trimestri per differenza.
 
 ```bash
 ias19tfr ifrs18 v2026_03.yaml v2026_06.yaml v2026_09.yaml --uscita "Prospetto IFRS18 2026.xlsx"
