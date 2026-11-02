@@ -2,6 +2,7 @@
 
     ias19tfr esegui valutazione.yaml       valutazione completa da file di configurazione
     ias19tfr valuta --dati ... --ipotesi ... --uscita ...   valutazione rapida senza movimentazione
+    ias19tfr ifrs18 q1.yaml q2.yaml q3.yaml --uscita prospetto.xlsx   movimentazioni trimestrali per IFRS 18
 
 Esempio di valutazione.yaml (vedi esempi/valutazione_esempio.yaml):
 
@@ -59,6 +60,50 @@ def _carica_dati(spec: dict, base: Path, cfg: dict):
     )
 
 
+def _movimentazione_cfg(cfg: dict, base: Path, dv, ip, metodo: str):
+    """Movimentazione rispetto alla valutazione `precedente` del YAML: (movimenti, ipotesi apertura, trasferimenti)."""
+    prec = cfg.get("precedente")
+    if not prec:
+        return None, None, {}
+    fprev = str(base / prec["file"])
+    ip_prev = ipotesi_da_excel(fprev)
+    if "dbo_apertura" in prec:
+        apertura = {int(k): float(v) for k, v in prec["dbo_apertura"].items()}
+    else:
+        dprev = dati_da_foglio_storico(fprev)
+        apertura = {k: r.dbo_metodo(metodo) for k, r in valuta(dprev.dipendenti, ip_prev).items() if k}
+    sc = {k: a.accantonamento for k, a in dv.aziende.items()}
+    vf = {k: a.utilizzi for k, a in dv.aziende.items()}
+    sc.update({int(k): float(v) for k, v in (cfg.get("service_cost") or {}).items()})
+    vf.update({int(k): float(v) for k, v in (cfg.get("variazioni_fondo") or {}).items()})
+    tr = {int(k): float(v) for k, v in (cfg.get("trasferimenti") or {}).items()}
+    mov = movimentazione(dv.dipendenti, ip_prev, ip, apertura, sc, vf,
+                         _data(prec["data"]), _data(cfg["data_valutazione"]), metodo, tr)
+    return mov, ip_prev, tr
+
+
+def ifrs18(configs, uscita: str, cliente: str = "") -> int:
+    """Prospetto trimestrale IFRS 18 da piu configurazioni YAML dello stesso esercizio."""
+    import yaml
+    from .ifrs18 import Periodo, scrivi_prospetto
+
+    periodi, nomi = [], {}
+    for c in configs:
+        base = Path(c).resolve().parent
+        cfg = yaml.safe_load(Path(c).read_text(encoding="utf-8"))
+        ip = ipotesi_da_excel(str(base / cfg["ipotesi"]))
+        dv = _carica_dati(cfg["dati"], base, cfg)
+        mov, _, _ = _movimentazione_cfg(cfg, base, dv, ip, cfg.get("metodo", "financial"))
+        if mov is None:
+            raise SystemExit(f"{c}: manca la sezione 'precedente'")
+        periodi.append(Periodo(_data(cfg["data_valutazione"]), mov))
+        nomi.update({k: a.nome for k, a in dv.aziende.items()})
+        cliente = cliente or (cfg.get("relazione") or {}).get("cliente", "")
+    scrivi_prospetto(uscita, periodi, nomi, cliente or "Gruppo")
+    print(f"Prospetto IFRS 18 scritto in {uscita}")
+    return 0
+
+
 def esegui(cfg_path: str) -> int:
     import yaml
 
@@ -75,25 +120,8 @@ def esegui(cfg_path: str) -> int:
     sens = griglia_sensitivity(dv.dipendenti, ip, metodo)
     sa = sensitivity_assoluta(dv.dipendenti, ip, metodo) if cfg.get("sensitivity_assoluta") else None
 
-    mov = None
-    ip_prev = None
-    tr = {}
+    mov, ip_prev, tr = _movimentazione_cfg(cfg, base, dv, ip, metodo)
     prec = cfg.get("precedente")
-    if prec:
-        fprev = str(base / prec["file"])
-        ip_prev = ipotesi_da_excel(fprev)
-        if "dbo_apertura" in prec:
-            apertura = {int(k): float(v) for k, v in prec["dbo_apertura"].items()}
-        else:
-            dprev = dati_da_foglio_storico(fprev)
-            apertura = {k: r.dbo_metodo(metodo) for k, r in valuta(dprev.dipendenti, ip_prev).items() if k}
-        sc = {k: a.accantonamento for k, a in dv.aziende.items()}
-        vf = {k: a.utilizzi for k, a in dv.aziende.items()}
-        sc.update({int(k): float(v) for k, v in (cfg.get("service_cost") or {}).items()})
-        vf.update({int(k): float(v) for k, v in (cfg.get("variazioni_fondo") or {}).items()})
-        tr = {int(k): float(v) for k, v in (cfg.get("trasferimenti") or {}).items()}
-        mov = movimentazione(dv.dipendenti, ip_prev, ip, apertura, sc, vf,
-                             _data(prec["data"]), _data(cfg["data_valutazione"]), metodo, tr)
 
     uscita = str(base / cfg["uscita"])
     scrivi_risultati(uscita, dv, res, csl, sens, metodo, ip=ip, movimenti=mov, sens_assoluta=sa,
@@ -128,6 +156,10 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     e = sub.add_parser("esegui", help="valutazione completa da file di configurazione YAML")
     e.add_argument("config")
+    f = sub.add_parser("ifrs18", help="prospetto trimestrale IFRS 18 da piu valutazioni dello stesso esercizio")
+    f.add_argument("config", nargs="+")
+    f.add_argument("--uscita", required=True)
+    f.add_argument("--cliente", default="")
     v = sub.add_parser("valuta", help="valutazione rapida e Excel dei risultati")
     v.add_argument("--dati", required=True)
     v.add_argument("--ipotesi", required=True, help="cartella con i fogli Tax e Tav")
@@ -139,6 +171,8 @@ def main(argv=None) -> int:
 
     if a.cmd == "esegui":
         return esegui(a.config)
+    if a.cmd == "ifrs18":
+        return ifrs18(a.config, a.uscita, a.cliente)
 
     ip = ipotesi_da_excel(a.ipotesi)
     if a.formato == "storico":

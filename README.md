@@ -51,6 +51,14 @@ restano quelli del modello). Vengono rigenerati dai risultati:
 Le tabelle che nel modello erano immagini diventano tabelle Word. Sommario e indici si aggiornano
 all'apertura del documento in Word (confermare la richiesta di aggiornamento dei campi).
 
+Prospetto delle movimentazioni trimestrali per la transizione all'IFRS 18 (service cost in categoria
+operativa, interest cost in categoria di finanziamento, utili/perdite attuariali in OCI), a partire
+dalle configurazioni delle valutazioni progressive dello stesso esercizio:
+
+```bash
+ias19tfr ifrs18 v2026_03.yaml v2026_06.yaml v2026_09.yaml --uscita "Prospetto IFRS18 2026.xlsx"
+```
+
 Valutazione rapida senza movimentazione:
 
 ```bash
@@ -93,3 +101,4 @@ I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e
 | `io_excel.py` | lettura schema cliente, foglio storico e file di ipotesi |
 | `output.py` | Excel dei risultati |
 | `relazione.py` | relazione tecnica Word dal modello |
+| `ifrs18.py` | movimentazioni trimestrali classificate per l'IFRS 18 |
