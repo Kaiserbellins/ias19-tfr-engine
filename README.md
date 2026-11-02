@@ -35,6 +35,22 @@ L'Excel dei risultati contiene i fogli Riepilogo (schede per azienda), Movimenta
 prospettico), Disclosure (duration, service cost pro futuro, erogazioni attese), Statistiche (per età
 e anzianità) e Dipendenti (risultati individuali).
 
+Con la sezione `relazione` del YAML viene prodotta anche la relazione tecnica Word, usando come
+modello una relazione già emessa (stili, copertina, intestazioni, testi metodologici e formule
+restano quelli del modello). Vengono rigenerati dai risultati:
+
+- cliente, data di valutazione, data di emissione, numero di dipendenti ed elenco delle società;
+- Tabelle 1-6 (RG48, dimissioni e anticipazioni, tavole di permanenza, tassi annui) e incrementi
+  salariali per categoria, dalle ipotesi della valutazione;
+- caratteristiche del collettivo (per società, per età e anzianità);
+- Tabella 7 della movimentazione e scomposizione degli utili/perdite attuariali per società;
+- informativa IAS 19: riconciliazione della DBO, ipotesi principali, sensitivity con variazioni
+  assolute, duration, service cost pro futuro, erogazioni attese;
+- allegati: scheda di valutazione e grafico prospettico per ogni società, griglie di sensitivity.
+
+Le tabelle che nel modello erano immagini diventano tabelle Word. Sommario e indici si aggiornano
+all'apertura del documento in Word (confermare la richiesta di aggiornamento dei campi).
+
 Valutazione rapida senza movimentazione:
 
 ```bash
@@ -59,7 +75,8 @@ IAS19_GAROFALO_XLSX=/percorso/foglio.xlsx pytest   # anche la riconciliazione co
 ```
 
 Per la movimentazione servono anche `IAS19_GAROFALO_PREV_XLSX` (valutazione precedente, da
-convertire in .xlsx se è un .xls) e `IAS19_SCHEMA_XLSX` (schema dati cliente).
+convertire in .xlsx se è un .xls) e `IAS19_SCHEMA_XLSX` (schema dati cliente); per la relazione
+`IAS19_RELAZIONE_DOCX` (relazione usata come modello).
 
 I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e `data/`).
 
@@ -74,3 +91,4 @@ I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e
 | `curva.py` | curva Svensson BCE e forward annui |
 | `io_excel.py` | lettura schema cliente, foglio storico e file di ipotesi |
 | `output.py` | Excel dei risultati |
+| `relazione.py` | relazione tecnica Word dal modello |

@@ -17,6 +17,11 @@ Esempio di valutazione.yaml (vedi esempi/valutazione_esempio.yaml):
       file: "TFR Garofalo_2025_12.xlsx"   # foglio storico: dati e ipotesi di apertura
     sensitivity_assoluta: true
     uscita: "Risultati IAS19 2026_09.xlsx"
+    relazione:                         # facoltativo: relazione tecnica Word
+      modello: "Relazione GHCSPA IAS19 2026_09.docx"   # relazione precedente usata come modello
+      uscita: "Relazione IAS19 2026_09.docx"
+      cliente: "Garofalo Healthcare S.p.A."            # default: parole chiave del modello
+      categorie: {1: "Dirigenti", 2: "Quadri", 3: "Impiegati"}   # nomi dei codici carriera
 """
 from __future__ import annotations
 
@@ -71,6 +76,8 @@ def esegui(cfg_path: str) -> int:
     sa = sensitivity_assoluta(dv.dipendenti, ip, metodo) if cfg.get("sensitivity_assoluta") else None
 
     mov = None
+    ip_prev = None
+    tr = {}
     prec = cfg.get("precedente")
     if prec:
         fprev = str(base / prec["file"])
@@ -91,6 +98,21 @@ def esegui(cfg_path: str) -> int:
     uscita = str(base / cfg["uscita"])
     scrivi_risultati(uscita, dv, res, csl, sens, metodo, ip=ip, movimenti=mov, sens_assoluta=sa,
                      data_valutazione=_data(cfg["data_valutazione"]).strftime("%d/%m/%Y"))
+    rel = cfg.get("relazione")
+    if rel:
+        import docx
+        from .relazione import DatiRelazione, scrivi_relazione
+        modello = str(base / rel["modello"])
+        cliente = rel.get("cliente") or (docx.Document(modello).core_properties.keywords or "").strip()
+        dr = DatiRelazione(
+            cliente=cliente, data_valutazione=_data(cfg["data_valutazione"]), dv=dv, res=res, csl=csl,
+            sens=sens, ip=ip, metodo=metodo, movimenti=mov, sens_assoluta=sa,
+            data_precedente=_data(prec["data"]) if prec else None, ip_precedente=ip_prev, trasferimenti=tr,
+            categorie={int(k): str(v) for k, v in (rel.get("categorie") or {}).items()},
+            data_emissione=_data(rel["data_emissione"]) if rel.get("data_emissione") else None)
+        scrivi_relazione(modello, str(base / rel["uscita"]), dr)
+        print(f"Relazione scritta in {base / rel['uscita']}")
+
     t = res[0]
     print(f"Dipendenti {t.n}  CCP {t.ccp:,.2f}  DBO {t.dbo_metodo(metodo):,.2f}")
     if mov:

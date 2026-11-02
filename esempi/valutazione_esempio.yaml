@@ -19,3 +19,10 @@ precedente:
 
 sensitivity_assoluta: true
 uscita: "Risultati IAS19 2026_09.xlsx"
+
+relazione:                        # relazione tecnica Word (facoltativa)
+  modello: "Relazione GHCSPA IAS19 2026_09.docx"   # relazione precedente usata come modello
+  uscita: "Relazione IAS19 Garofalo 2026_09.docx"
+  cliente: "Garofalo Healthcare S.p.A."            # default: parole chiave del modello
+  # categorie: {1: "Dirigenti", 2: "Quadri", 3: "Impiegati"}   # nomi dei codici carriera
+  # data_emissione: 2026-11-02                     # default: oggi
