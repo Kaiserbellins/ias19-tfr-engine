@@ -6,3 +6,6 @@ __pycache__/
 data/
 *.xlsx
 !tests/fixtures/*.xlsx
+*.xls
+*.docx
+*.pdf
