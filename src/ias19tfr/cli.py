@@ -82,7 +82,8 @@ def _movimentazione_cfg(cfg: dict, base: Path, dv, ip, metodo: str):
     return mov, ip_prev, tr
 
 
-def ifrs18(configs, uscita: str, cliente: str = "", trimestri: bool = False) -> int:
+def ifrs18(configs, uscita: str, cliente: str = "", trimestri: bool = False, nota_modello: str = "",
+           nota_uscita: str = "", autore: str = "") -> int:
     """Prospetto trimestrale IFRS 18 da piu configurazioni YAML dello stesso esercizio."""
     import yaml
     from .ifrs18 import Periodo, scrivi_prospetto
@@ -93,7 +94,7 @@ def ifrs18(configs, uscita: str, cliente: str = "", trimestri: bool = False) -> 
         cfg = yaml.safe_load(Path(c).read_text(encoding="utf-8"))
         ip = ipotesi_da_excel(str(base / cfg["ipotesi"]))
         dv = _carica_dati(cfg["dati"], base, cfg)
-        mov, _, _ = _movimentazione_cfg(cfg, base, dv, ip, cfg.get("metodo", "financial"))
+        mov, ip_prev, _ = _movimentazione_cfg(cfg, base, dv, ip, cfg.get("metodo", "financial"))
         if mov is None:
             raise SystemExit(f"{c}: manca la sezione 'precedente'")
         periodi.append(Periodo(_data(cfg["data_valutazione"]), mov))
@@ -101,6 +102,12 @@ def ifrs18(configs, uscita: str, cliente: str = "", trimestri: bool = False) -> 
         cliente = cliente or (cfg.get("relazione") or {}).get("cliente", "")
     scrivi_prospetto(uscita, periodi, nomi, cliente or "Gruppo", trimestri=trimestri)
     print(f"Prospetto IFRS 18 scritto in {uscita}")
+    if nota_modello:
+        from .nota_ifrs18 import scrivi_nota
+        nota_uscita = nota_uscita or str(Path(uscita).with_suffix(".docx"))
+        scrivi_nota(nota_modello, nota_uscita, periodi, nomi, cliente or "Gruppo", autore=autore,
+                    tasso_nie=float(ip_prev.finanziarie.attualizzazione[0]) if ip_prev else None)
+        print(f"Nota per il cliente scritta in {nota_uscita}")
     return 0
 
 
@@ -160,6 +167,9 @@ def main(argv=None) -> int:
     f.add_argument("config", nargs="+")
     f.add_argument("--uscita", required=True)
     f.add_argument("--cliente", default="")
+    f.add_argument("--nota-modello", default="", help="template Word della nota per il cliente")
+    f.add_argument("--nota-uscita", default="")
+    f.add_argument("--autore", default="")
     f.add_argument("--trimestri", action="store_true",
                    help="singoli trimestri per differenza (default: progressivi dall'inizio dell'esercizio)")
     v = sub.add_parser("valuta", help="valutazione rapida e Excel dei risultati")
@@ -174,7 +184,7 @@ def main(argv=None) -> int:
     if a.cmd == "esegui":
         return esegui(a.config)
     if a.cmd == "ifrs18":
-        return ifrs18(a.config, a.uscita, a.cliente, a.trimestri)
+        return ifrs18(a.config, a.uscita, a.cliente, a.trimestri, a.nota_modello, a.nota_uscita, a.autore)
 
     ip = ipotesi_da_excel(a.ipotesi)
     if a.formato == "storico":

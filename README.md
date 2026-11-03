@@ -60,6 +60,10 @@ passività di fine esercizio precedente; con `--trimestri` si ottengono i singol
 ias19tfr ifrs18 v2026_03.yaml v2026_06.yaml v2026_09.yaml --uscita "Prospetto IFRS18 2026.xlsx"
 ```
 
+Con `--nota-modello template.docx --nota-uscita nota.docx --autore "Nome"` viene prodotta anche una
+breve nota per il cliente sul template documentale dello studio (copertina, metadati e revisioni
+compilati; corpo con classificazione IFRS 18, movimentazione del gruppo e per società, note).
+
 Valutazione rapida senza movimentazione:
 
 ```bash
@@ -103,3 +107,4 @@ I dati dei clienti non vanno mai nel repository (`.gitignore` esclude `*.xlsx` e
 | `output.py` | Excel dei risultati |
 | `relazione.py` | relazione tecnica Word dal modello |
 | `ifrs18.py` | movimentazioni trimestrali classificate per l'IFRS 18 |
+| `nota_ifrs18.py` | nota per il cliente sul template documentale |
